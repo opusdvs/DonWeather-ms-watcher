@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/domain"
 )
@@ -16,12 +18,22 @@ func NewEventRepository(conn *nats.Conn) *EventRepository {
 	return &EventRepository{conn: conn}
 }
 
+// нужно будет доработать, чтобы использовать контекст для отмены операции
 func (r *EventRepository) CreateEventWeather(ctx context.Context, event *domain.EventWeather) error {
-	json, err := json.Marshal(event)
+	message := domain.EventWeatherMessage{
+		ID:        uuid.New().String(),
+		Data:      *event,
+		Timestamp: time.Now(),
+		Type:      string(event.EventType),
+		Source:    "weather-service",
+		Version:   "1.0.0",
+	}
+	json, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
-	err = r.conn.Publish(string(event.EventType), json)
+	subject := "event.weather.message" + "." + string(event.EventType)
+	err = r.conn.Publish(subject, json)
 	if err != nil {
 		return err
 	}

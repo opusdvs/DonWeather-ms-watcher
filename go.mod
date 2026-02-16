@@ -3,6 +3,7 @@ module github.com/opusdvs/DonWeather-ms-watcher
 go 1.24.3
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/nats-io/nats.go v1.48.0
 	github.com/redis/go-redis/v9 v9.17.3
 )

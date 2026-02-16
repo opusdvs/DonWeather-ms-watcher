@@ -26,6 +26,15 @@ const (
 	EventPressureRise EventType = "PRESSURE_RISE"
 )
 
+type EventWeatherMessage struct {
+	ID        string       `json:"id"`
+	Data      EventWeather `json:"data"`
+	Timestamp time.Time    `json:"timestamp"`
+	Type      string       `json:"type"`
+	Source    string       `json:"source"`
+	Version   string       `json:"version"`
+}
+
 type Subscribe struct {
 	ID      string  `json:"id"`
 	City    string  `json:"city"`
