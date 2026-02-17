@@ -8,6 +8,7 @@ type EventRepository interface {
 type WeatherRepository interface {
 	GetLastStateWeather(ctx context.Context, city string) (*StateWeather, error)
 	GetCurrentStateWeather(ctx context.Context, city string) (*StateWeather, error)
+	SaveStateWeather(ctx context.Context, city string, stateWeather *StateWeather) error
 }
 
 type SubscriptionRepository interface {

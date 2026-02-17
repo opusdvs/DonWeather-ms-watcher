@@ -11,11 +11,24 @@ import (
 )
 
 type EventRepository struct {
-	conn *nats.Conn
+	natsConn nats.JetStreamContext
 }
 
-func NewEventRepository(conn *nats.Conn) *EventRepository {
-	return &EventRepository{conn: conn}
+func NewEventRepository(natsConn *nats.Conn) (*EventRepository, error) {
+	js, err := natsConn.JetStream()
+	if err != nil {
+		return nil, err
+	}
+	_, err = js.AddStream(&nats.StreamConfig{
+		Name:      "WEATHER_EVENTS",
+		Subjects:  []string{"event.weather.message.*"},
+		Storage:   nats.FileStorage,
+		Retention: nats.LimitsPolicy,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &EventRepository{natsConn: js}, nil
 }
 
 // нужно будет доработать, чтобы использовать контекст для отмены операции
@@ -28,12 +41,12 @@ func (r *EventRepository) CreateEventWeather(ctx context.Context, event *domain.
 		Source:    "weather-service",
 		Version:   "1.0.0",
 	}
-	json, err := json.Marshal(message)
+	jsonData, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
 	subject := "event.weather.message" + "." + string(event.EventType)
-	err = r.conn.Publish(subject, json)
+	_, err = r.natsConn.Publish(subject, jsonData)
 	if err != nil {
 		return err
 	}

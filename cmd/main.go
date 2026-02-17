@@ -5,10 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/nats-io/nats.go"
+	"github.com/opusdvs/DonWeather-ms-watcher/internal/delivery"
+	"github.com/opusdvs/DonWeather-ms-watcher/internal/delivery/middleware"
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/repository"
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/usecase"
 	"github.com/redis/go-redis/v9"
@@ -45,8 +52,11 @@ func main() {
 	if redisHost == "" {
 		log.Fatal("REDIS_HOST is not set")
 	}
-	redisDB := 0
-	db, err := sql.Open("postgres", fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName))
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		log.Fatal("REDIS_PORT is not set")
+	}
+	db, err := sql.Open("pgx", fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPassword, dbName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -66,8 +76,8 @@ func main() {
 	}
 	defer natsConn.Close()
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: redisHost,
-		DB:   int(redisDB),
+		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
+		DB:   0,
 	})
 	defer redisClient.Close()
 	redisPingCtx, redisPingCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -78,9 +88,25 @@ func main() {
 	}
 	fmt.Println(pong)
 
-	eventRepo := repository.NewEventRepository(natsConn)
-	weatherRepo := repository.NewWeatherRepository(redisClient)
+	eventRepo, err := repository.NewEventRepository(natsConn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	weatherRepo := repository.NewWeatherRepository(redisClient, weatherApiURL)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	weatherService := usecase.NewWeatherService(weatherRepo, subscriptionRepo, eventRepo)
+	weatherDelivery := delivery.NewWeatherHTTPHandler(*weatherService)
 
+	weatherMux := http.NewServeMux()
+	weatherMux.HandleFunc("/api/v1/process-subscriptions", weatherDelivery.ProcessSubscriptions)
+	handleMiddleware := middleware.MiddlewareChain(weatherMux, middleware.CorsMiddleware)
+
+	mainMux := http.NewServeMux()
+	mainMux.Handle("/", handleMiddleware)
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mainMux,
+	}
+	server.ListenAndServe()
 }

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/domain"
@@ -37,28 +38,53 @@ func (s *WeatherService) CreateEventWeather(ctx context.Context, event *domain.E
 	return s.eventRepository.CreateEventWeather(ctx, event)
 }
 
+func (s *WeatherService) SaveStateWeather(ctx context.Context, city string, stateWeather *domain.StateWeather) error {
+	return s.weatherRepository.SaveStateWeather(ctx, city, stateWeather)
+}
+
 func (s *WeatherService) ProcessSubscriptions(ctx context.Context) error {
+	log.Println("Processing subscriptions")
 	subscriptions, err := s.GetActiveSubscriptions(ctx)
 	if err != nil {
+		log.Println("Error getting active subscriptions:", err)
 		return err
 	}
 	for _, subscription := range subscriptions {
-		lastState, err := s.weatherRepository.GetLastStateWeather(ctx, subscription.City)
+		log.Println("Processing subscription:", subscription.City)
+		lastState, err := s.GetLastStateWeather(ctx, subscription.City)
 		if err != nil {
-			continue
+			log.Println("Error getting last state weather:", err)
 		}
-
-		currentState, err := s.weatherRepository.GetCurrentStateWeather(ctx, subscription.City)
+		currentState, err := s.GetCurrentStateWeather(ctx, subscription.City)
 		if err != nil {
-			continue
+			log.Println("Error getting current state weather:", err)
+			return err
+		}
+		if lastState == nil {
+			lastState = currentState
+		}
+		err = s.SaveStateWeather(ctx, subscription.City, currentState)
+		if err != nil {
+			log.Println("Error saving state weather:", err)
+			return err
 		}
 
 		events, err := s.CompareStateWeather(ctx, &subscription, lastState, currentState)
 		if err != nil {
-			continue
+			log.Println("Error comparing state weather:", err)
+			return err
 		}
 		for _, event := range events {
-			s.eventRepository.CreateEventWeather(ctx, event)
+			err = s.eventRepository.CreateEventWeather(ctx, event)
+			if err != nil {
+				log.Println("Error creating event weather:", err)
+				return err
+			}
+		}
+		err = s.SaveStateWeather(ctx, subscription.City, currentState)
+		if err != nil {
+			log.Println("Error saving state weather:", err)
+			return err
 		}
 	}
 	return nil
@@ -68,7 +94,7 @@ func (s *WeatherService) ProcessSubscriptions(ctx context.Context) error {
 func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *domain.Subscribe, lastState *domain.StateWeather, currentState *domain.StateWeather) ([]*domain.EventWeather, error) {
 	events := []*domain.EventWeather{}
 	if subscription.Filters.Temperature {
-		if currentState.Temperature < lastState.Temperature+domain.TempRiseThreshold {
+		if lastState != nil && currentState.Temperature < lastState.Temperature+domain.TempRiseThreshold {
 			events = append(events, &domain.EventWeather{
 				EventType: domain.EventTempDrop,
 				OldValue:  lastState.Temperature,
@@ -76,7 +102,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 				CreatedAt: time.Now(),
 			})
 		}
-	} else if currentState.Temperature > lastState.Temperature-domain.TempDropThreshold {
+	} else if lastState != nil && currentState.Temperature > lastState.Temperature-domain.TempDropThreshold {
 		events = append(events, &domain.EventWeather{
 			EventType: domain.EventTempRise,
 			OldValue:  lastState.Temperature,
@@ -85,7 +111,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 		})
 	}
 	if subscription.Filters.Humidity {
-		if currentState.Humidity < lastState.Humidity+domain.HumidityChangeThreshold {
+		if lastState != nil && currentState.Humidity < lastState.Humidity+domain.HumidityChangeThreshold {
 			events = append(events, &domain.EventWeather{
 				EventType: domain.EventHumidityDrop,
 				OldValue:  lastState.Humidity,
@@ -93,7 +119,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 				CreatedAt: time.Now(),
 			})
 		}
-	} else if currentState.Humidity > lastState.Humidity-domain.HumidityChangeThreshold {
+	} else if lastState != nil && currentState.Humidity > lastState.Humidity-domain.HumidityChangeThreshold {
 		events = append(events, &domain.EventWeather{
 			EventType: domain.EventHumidityRise,
 			OldValue:  lastState.Humidity,
@@ -102,7 +128,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 		})
 	}
 	if subscription.Filters.WindSpeed {
-		if currentState.WindSpeed < lastState.WindSpeed+domain.StrongWindThreshold {
+		if lastState != nil && currentState.WindSpeed < lastState.WindSpeed+domain.StrongWindThreshold {
 			events = append(events, &domain.EventWeather{
 				EventType: domain.EventStrongWind,
 				OldValue:  lastState.WindSpeed,
@@ -110,7 +136,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 				CreatedAt: time.Now(),
 			})
 		}
-	} else if currentState.WindSpeed > lastState.WindSpeed-domain.StrongWindThreshold {
+	} else if lastState != nil && currentState.WindSpeed > lastState.WindSpeed-domain.StrongWindThreshold {
 		events = append(events, &domain.EventWeather{
 			EventType: domain.EventStrongWind,
 			OldValue:  lastState.WindSpeed,
@@ -119,7 +145,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 		})
 	}
 	if subscription.Filters.Pressure {
-		if currentState.Pressure < lastState.Pressure+domain.PressureChangeThreshold {
+		if lastState != nil && currentState.Pressure < lastState.Pressure+domain.PressureChangeThreshold {
 			events = append(events, &domain.EventWeather{
 				EventType: domain.EventPressureDrop,
 				OldValue:  lastState.Pressure,
@@ -127,7 +153,7 @@ func (s *WeatherService) CompareStateWeather(ctx context.Context, subscription *
 				CreatedAt: time.Now(),
 			})
 		}
-	} else if currentState.Pressure > lastState.Pressure-domain.PressureChangeThreshold {
+	} else if lastState != nil && currentState.Pressure > lastState.Pressure-domain.PressureChangeThreshold {
 		events = append(events, &domain.EventWeather{
 			EventType: domain.EventPressureRise,
 			OldValue:  lastState.Pressure,

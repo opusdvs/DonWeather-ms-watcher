@@ -1,7 +1,7 @@
 package delivery
 
 import (
-	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/usecase"
@@ -15,12 +15,13 @@ func NewWeatherHTTPHandler(weatherService usecase.WeatherService) *WeatherHTTPHa
 	return &WeatherHTTPHandler{weatherService: weatherService}
 }
 
-func (h *WeatherHTTPHandler) GetLastStateWeather(w http.ResponseWriter, r *http.Request) {
-	city := r.URL.Query().Get("city")
-	state, err := h.weatherService.GetLastStateWeather(r.Context(), city)
+func (h *WeatherHTTPHandler) ProcessSubscriptions(w http.ResponseWriter, r *http.Request) {
+	err := h.weatherService.ProcessSubscriptions(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println("Error processing subscriptions:", err)
 		return
 	}
-	json.NewEncoder(w).Encode(state)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("Subscriptions processed successfully"))
 }
