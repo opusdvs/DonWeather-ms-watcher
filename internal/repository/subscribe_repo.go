@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 
 	"github.com/opusdvs/DonWeather-ms-watcher/internal/domain"
 )
@@ -17,7 +18,7 @@ func NewSubscriptionRepository(db *sql.DB) *SubscriptionRepository {
 }
 
 func (r *SubscriptionRepository) GetActiveSubscriptions(ctx context.Context) ([]domain.Subscribe, error) {
-	query := "SELECT id, city, filters FROM subscribe"
+	query := "SELECT id, city, filters, telegram_id FROM subscribe"
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -27,7 +28,8 @@ func (r *SubscriptionRepository) GetActiveSubscriptions(ctx context.Context) ([]
 	for rows.Next() {
 		var subscription domain.Subscribe
 		var rawFilters []byte
-		err = rows.Scan(&subscription.ID, &subscription.City, &rawFilters)
+		var telegramID string
+		err = rows.Scan(&subscription.ID, &subscription.City, &rawFilters, &telegramID)
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +37,9 @@ func (r *SubscriptionRepository) GetActiveSubscriptions(ctx context.Context) ([]
 		if err != nil {
 			return nil, err
 		}
+		subscription.TelegramID = telegramID
 		subscriptions = append(subscriptions, subscription)
+		log.Println("Subscription:", subscriptions)
 	}
 	return subscriptions, nil
 }

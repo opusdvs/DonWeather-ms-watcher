@@ -27,18 +27,20 @@ const (
 )
 
 type EventWeatherMessage struct {
-	ID        string       `json:"id"`
-	Data      EventWeather `json:"data"`
-	Timestamp time.Time    `json:"timestamp"`
-	Type      string       `json:"type"`
-	Source    string       `json:"source"`
-	Version   string       `json:"version"`
+	ID         string       `json:"id"`
+	TelegramID string       `json:"telegram_id"`
+	Data       EventWeather `json:"data"`
+	Timestamp  time.Time    `json:"timestamp"`
+	Type       string       `json:"type"`
+	Source     string       `json:"source"`
+	Version    string       `json:"version"`
 }
 
 type Subscribe struct {
-	ID      string  `json:"id"`
-	City    string  `json:"city"`
-	Filters Filters `json:"filters"`
+	ID         string  `json:"id"`
+	City       string  `json:"city"`
+	Filters    Filters `json:"filters"`
+	TelegramID string  `json:"telegram_id"`
 }
 
 type Filters struct {
@@ -49,16 +51,24 @@ type Filters struct {
 }
 
 type StateWeather struct {
-	City        string    `json:"city"`
-	Temperature float64   `json:"temperature"`
-	WindSpeed   float64   `json:"wind_speed"`
-	Humidity    float64   `json:"humidity"`
-	Pressure    float64   `json:"pressure"`
-	Clouds      float64   `json:"clouds"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Location struct {
+		Name string `json:"name"`
+	} `json:"location"`
+	Current struct {
+		LastUpdated string  `json:"last_updated"`
+		TempC       float64 `json:"temp_c"`
+		Humidity    float64 `json:"humidity"`
+		PressureMb  float64 `json:"pressure_mb"`
+		WindKph     float64 `json:"wind_kph"`
+		Condition   struct {
+			Text string `json:"text"`
+		} `json:"condition"`
+	} `json:"current"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type EventWeather struct {
+	City      string    `json:"city"`
 	EventType EventType `json:"event_type"`
 	OldValue  float64   `json:"old_value"`
 	NewValue  float64   `json:"new_value"`

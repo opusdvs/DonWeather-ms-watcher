@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,19 +29,30 @@ func NewEventRepository(natsConn *nats.Conn) (*EventRepository, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = js.AddStream(&nats.StreamConfig{
+		Name:      "TELEGRAM_EVENTS",
+		Subjects:  []string{"event.telegram.message.send"},
+		Storage:   nats.FileStorage,
+		Retention: nats.LimitsPolicy,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &EventRepository{natsConn: js}, nil
 }
 
 // нужно будет доработать, чтобы использовать контекст для отмены операции
-func (r *EventRepository) CreateEventWeather(ctx context.Context, event *domain.EventWeather) error {
+func (r *EventRepository) CreateEventWeather(ctx context.Context, subscription domain.Subscribe, event domain.EventWeather) error {
 	message := domain.EventWeatherMessage{
-		ID:        uuid.New().String(),
-		Data:      *event,
-		Timestamp: time.Now(),
-		Type:      string(event.EventType),
-		Source:    "weather-service",
-		Version:   "1.0.0",
+		ID:         uuid.New().String(),
+		TelegramID: subscription.TelegramID,
+		Data:       event,
+		Timestamp:  time.Now(),
+		Type:       string(event.EventType),
+		Source:     "weather-service",
+		Version:    "1.0.0",
 	}
+	log.Println("Event:", message)
 	jsonData, err := json.Marshal(message)
 	if err != nil {
 		return err
