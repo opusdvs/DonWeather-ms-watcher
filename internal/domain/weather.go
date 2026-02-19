@@ -5,13 +5,13 @@ import "time"
 type EventType string
 
 const (
-	TempRiseThreshold       = 5.0
-	TempDropThreshold       = 5.0
-	StrongWindThreshold     = 15.0
-	RainStartThreshold      = 70.0
-	RainStopThreshold       = 30.0
-	PressureChangeThreshold = 10.0
-	HumidityChangeThreshold = 20.0
+	TempRiseThreshold       = 1.0
+	TempDropThreshold       = 1.0
+	StrongWindThreshold     = 2.0
+	RainStartThreshold      = 20.0
+	RainStopThreshold       = 20.0
+	PressureChangeThreshold = 5.0
+	HumidityChangeThreshold = 5.0
 )
 
 const (
